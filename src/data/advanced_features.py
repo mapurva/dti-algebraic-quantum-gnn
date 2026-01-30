@@ -1,3 +1,4 @@
+from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -9,8 +10,14 @@ def morgan_fingerprint(smiles, radius=2, n_bits=1024):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return np.zeros(n_bits)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
+
+    generator = rdFingerprintGenerator.GetMorganGenerator(
+        radius=radius,
+        fpSize=n_bits
+    )
+    fp = generator.GetFingerprint(mol)
     return np.array(fp)
+
 
 
 def kmer_features(sequence, k=3, vocab=None):
