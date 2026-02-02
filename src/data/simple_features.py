@@ -1,40 +1,56 @@
+import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 
 def build_simple_features(interactions, drugs, proteins):
     """
-    Build simple numeric features for MLP baseline.
-
-    Drug feature:
-        - length of SMILES string
-
-    Protein feature:
-        - length of amino acid sequence
+    Build simple baseline features.
 
     Returns:
-        X (pd.DataFrame), y (np.ndarray)
-    """
-    drug_smiles = drugs
-    protein_seqs = proteins
+        drug_features: dict[drug_id] -> np.array
+        protein_features: dict[protein_id] -> np.array
 
-    features = []
-    targets = []
+    This function is dataset-agnostic:
+    - Uses `pkd` if present (Davis)
+    - Uses `affinity` otherwise (KIBA)
+    """
+
+    # --- Drug features: simple statistics over interactions ---
+    drug_values = defaultdict(list)
+    protein_values = defaultdict(list)
 
     for _, row in interactions.iterrows():
-        d_id = row["drug_id"]
-        p_id = row["protein_id"]
+        d = row["drug_id"]
+        p = row["protein_id"]
 
-        smiles = drug_smiles[d_id]
-        sequence = protein_seqs[p_id]
+        if "pkd" in row:
+            val = row["pkd"]
+        else:
+            val = row["affinity"]
 
-        features.append({
-            "smiles_len": len(smiles),
-            "seq_len": len(sequence)
-        })
+        drug_values[d].append(val)
+        protein_values[p].append(val)
 
-        targets.append(row["pkd"])
+    # Aggregate statistics
+    drug_features = {}
+    for d, vals in drug_values.items():
+        vals = np.array(vals)
+        drug_features[d] = np.array([
+            vals.mean(),
+            vals.std(),
+            vals.min(),
+            vals.max()
+        ], dtype=np.float32)
 
-    X = pd.DataFrame(features)
-    y = pd.Series(targets)
+    protein_features = {}
+    for p, vals in protein_values.items():
+        vals = np.array(vals)
+        protein_features[p] = np.array([
+            vals.mean(),
+            vals.std(),
+            vals.min(),
+            vals.max()
+        ], dtype=np.float32)
 
-    return X, y
+    return drug_features, protein_features
