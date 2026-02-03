@@ -1,27 +1,54 @@
 import torch
+from torch_geometric.data import Data
+from rdkit import Chem
+
 from data.mol_graph import mol_to_graph
 
 
 def build_gnn_dataset(interactions, drugs, protein_features):
     """
-    Build PyG dataset for DTI.
+    Build PyG dataset for Drug GNN + protein features.
 
-    protein_features: dict {protein_id: feature vector}
+    Args:
+        interactions (pd.DataFrame):
+            Columns: drug_id, protein_id, pkd OR affinity
+        drugs (dict):
+            drug_id -> SMILES
+        protein_features (dict):
+            protein_id -> np.array
+
+    Returns:
+        List[torch_geometric.data.Data]
     """
+
     data_list = []
 
     for _, row in interactions.iterrows():
-        d_id = row["drug_id"]
-        p_id = row["protein_id"]
+        drug_id = row["drug_id"]
+        protein_id = row["protein_id"]
 
-        graph = mol_to_graph(drugs[d_id])
-        if graph is None:
+        # --- Target value (Davis vs KIBA) ---
+        if "pkd" in row:
+            y_val = row["pkd"]
+        else:
+            y_val = row["affinity"]
+
+        # --- Drug graph ---
+        smiles = drugs[drug_id]
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
             continue
 
-        graph.y = torch.tensor(row["pkd"], dtype=torch.float)
+        graph = mol_to_graph(mol)
+
+        # --- Protein features ---
         graph.protein_feat = torch.tensor(
-            protein_features[p_id], dtype=torch.float
+            protein_features[protein_id],
+            dtype=torch.float32
         )
+
+        # --- Label ---
+        graph.y = torch.tensor(y_val, dtype=torch.float32)
 
         data_list.append(graph)
 

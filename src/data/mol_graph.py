@@ -3,19 +3,17 @@ from torch_geometric.data import Data
 from rdkit import Chem
 
 
-def mol_to_graph(smiles):
+def mol_to_graph(mol):
     """
-    Convert SMILES string to PyG Data object.
+    Convert an RDKit Mol object into a PyTorch Geometric Data graph.
     """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
 
     # Node features: atomic number
-    x = []
+    atom_features = []
     for atom in mol.GetAtoms():
-        x.append([atom.GetAtomicNum()])
-    x = torch.tensor(x, dtype=torch.float)
+        atom_features.append([atom.GetAtomicNum()])
+
+    x = torch.tensor(atom_features, dtype=torch.float)
 
     # Edge index
     edge_index = []
@@ -27,4 +25,5 @@ def mol_to_graph(smiles):
 
     edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
 
-    return Data(x=x, edge_index=edge_index)
+    data = Data(x=x, edge_index=edge_index)
+    return data
