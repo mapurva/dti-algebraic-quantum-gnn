@@ -61,3 +61,33 @@ def concordance_index(y_true, y_pred):
                     h_sum += 0.5
 
     return h_sum / n if n > 0 else 0.0
+
+
+
+#import numpy as np
+
+def expected_calibration_error(y_true, y_pred, y_var, n_bins=10):
+    """
+    ECE for regression using uncertainty as inverse confidence
+    """
+
+    # Convert variance → confidence (higher var = lower confidence)
+    confidence = 1 / (1 + y_var)
+
+    errors = np.abs(y_true - y_pred)
+
+    bins = np.linspace(0, 1, n_bins + 1)
+    ece = 0.0
+
+    for i in range(n_bins):
+        mask = (confidence >= bins[i]) & (confidence < bins[i + 1])
+
+        if np.sum(mask) == 0:
+            continue
+
+        avg_conf = np.mean(confidence[mask])
+        avg_err = np.mean(errors[mask])
+
+        ece += np.abs(avg_conf - (1 - avg_err)) * np.sum(mask) / len(y_true)
+
+    return ece
