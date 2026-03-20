@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.metrics import rmse, mae, pearson, concordance_index
+from utils.metrics import rmse, mae, pearson, concordance_index
 
 
 def main():
