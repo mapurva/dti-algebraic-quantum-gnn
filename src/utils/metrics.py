@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
 
@@ -91,3 +92,54 @@ def expected_calibration_error(y_true, y_pred, y_var, n_bins=10):
         ece += np.abs(avg_conf - (1 - avg_err)) * np.sum(mask) / len(y_true)
 
     return ece
+    
+    
+#import numpy as np
+#import matplotlib.pyplot as plt
+
+
+def plot_reliability_diagram(y_true, y_pred, y_var, n_bins=10, save_path="reliability_diagram.png"):
+    """
+    Reliability diagram for regression using uncertainty-derived confidence
+    """
+
+    # Convert variance → confidence
+    confidence = 1 / (1 + y_var)
+
+    errors = np.abs(y_true - y_pred)
+
+    bins = np.linspace(0, 1, n_bins + 1)
+
+    bin_conf = []
+    bin_acc = []
+
+    for i in range(n_bins):
+        mask = (confidence >= bins[i]) & (confidence < bins[i + 1])
+
+        if np.sum(mask) == 0:
+            continue
+
+        avg_conf = np.mean(confidence[mask])
+        avg_err = np.mean(errors[mask])
+
+        # Convert error → accuracy proxy
+        acc = 1 - avg_err
+
+        bin_conf.append(avg_conf)
+        bin_acc.append(acc)
+
+    # Plot
+    plt.figure(figsize=(5, 5))
+
+    plt.plot([0, 1], [0, 1], 'k--', label="Perfect Calibration")
+    plt.plot(bin_conf, bin_acc, marker='o', label="Model")
+
+    plt.xlabel("Confidence")
+    plt.ylabel("Empirical Accuracy")
+    plt.title("Reliability Diagram")
+
+    plt.legend()
+    plt.tight_layout()
+
+    plt.savefig(save_path, dpi=300)
+    print(f"Saved: {save_path}")    

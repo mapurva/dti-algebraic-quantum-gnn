@@ -7,25 +7,28 @@ import matplotlib.pyplot as plt
 
 from torch_geometric.loader import DataLoader
 
+from src.utils.metrics import (
+    rmse,
+    expected_calibration_error,
+    plot_reliability_diagram
+)
+
 from src.data.load_davis import load_davis
 from src.data.build_interactions import build_interaction_table
 from src.data.cold_splits import cold_target_split
 from src.data.simple_features import build_simple_features
 from src.data.gnn_dataset import build_gnn_dataset
 from src.training.dti_gnn_model import DTIGNN
-from src.utils.metrics import rmse, expected_calibration_error
 
 
 def mc_dropout_predictions(model, loader, T=20):
     """
-    Perform MC Dropout inference
+    MC Dropout inference
     """
 
-    model.train()  # enable dropout
+    model.train()  # 🔥 keep dropout ON
 
-    all_means = []
-    all_vars = []
-    all_targets = []
+    all_means, all_vars, all_targets = [], [], []
 
     for batch in loader:
 
@@ -45,7 +48,11 @@ def mc_dropout_predictions(model, loader, T=20):
         all_vars.extend(var_pred.flatten())
         all_targets.extend(batch.y.cpu().numpy().flatten())
 
-    return np.array(all_means), np.array(all_vars), np.array(all_targets)
+    return (
+        np.array(all_means),
+        np.array(all_vars),
+        np.array(all_targets),
+    )
 
 
 def main():
@@ -66,7 +73,11 @@ def main():
 
     print("Loading trained Drug GNN model...")
     model = DTIGNN(len(next(iter(protein_feats.values()))))
-    model.load_state_dict(torch.load("models/drug_gnn_davis.pt"))
+
+    model.load_state_dict(
+        torch.load("models/drug_gnn_davis.pt", map_location="cpu")
+    )
+
     model.eval()
 
     print("Running MC Dropout...")
@@ -77,7 +88,12 @@ def main():
     # ---- Metrics ----
     rmse_val = rmse(targets, mean_pred)
     ece_val = expected_calibration_error(targets, mean_pred, var_pred)
-    corr = np.corrcoef(var_pred, error)[0, 1]
+
+    # safer correlation
+    if np.std(var_pred) > 0:
+        corr = np.corrcoef(var_pred, error)[0, 1]
+    else:
+        corr = 0.0
 
     print("\n=== Uncertainty Evaluation ===")
     print("RMSE:", rmse_val)
@@ -95,7 +111,18 @@ def main():
     plt.tight_layout()
     plt.savefig("uncertainty_scatter.png", dpi=300)
 
-    print("Figure saved as uncertainty_scatter.png")
+    print("Saved: uncertainty_scatter.png")
+
+    # ---- Reliability Diagram ----
+    plot_reliability_diagram(
+        targets,
+        mean_pred,
+        var_pred,
+        n_bins=10,
+        save_path="reliability_diagram.png"
+    )
+
+    print("Saved: reliability_diagram.png")
 
 
 if __name__ == "__main__":
